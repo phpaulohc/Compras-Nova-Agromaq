@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compras Nova Agromaq</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        header {
+            background-color: #2800da;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        main {
+            margin: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        table th {
+            background-color: #2800da;
+            color: white;
+        }
+
+        .form-container {
+            margin-bottom: 20px;
+        }
+
+        input, button, select {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            background-color: #2800da;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2800da;
+        }
+
+        .status-ok {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-cancelled {
+            color: red;
+            font-weight: bold;
+        }
+
+        .status-pending {
+            color: orange;
+            font-weight: bold;
+        }
+
+        .details {
+            color: darkblue;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Compras Nova Agromaq</h1>
+    </header>
+    <main>
+        <div class="form-container">
+            <h2>Adicionar Peça</h2>
+            <form id="addForm">
+                <input type="text" id="itemName" placeholder="Nome da Peça" required>
+                <input type="number" id="itemQuantity" placeholder="Quantidade" min="1" required>
+                <input type="text" id="requestedBy" placeholder="Solicitante" required>
+                <button type="submit">Adicionar</button>
+            </form>
+            <button class="no-print" onclick="printPendingItems()">Imprimir Pendentes</button>
+        </div>
+
+        <h2>Lista de Peças</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome da Peça</th>
+                    <th>Quantidade</th>
+                    <th>Solicitante</th>
+                    <th>Data</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="itemsTable">
+                <!-- Itens adicionados aparecerão aqui -->
+            </tbody>
+        </table>
+    </main>
+
+    <script>
+        const addForm = document.getElementById('addForm');
+        const itemsTable = document.getElementById('itemsTable');
+        const itemsData = {};
+
+        function createTableRow(itemName, quantity, requestedBy, date, status) {
+            const row = document.createElement('tr');
+
+            row.innerHTML = `
+                <td class="details">${itemName}</td>
+                <td class="details">${quantity}</td>
+                <td>${requestedBy}</td>
+                <td>${date}</td>
+                <td class="status status-pending">${status}</td>
+                <td>
+                    <button onclick="markStatus(this, 'ok')">OK</button>
+                    <button onclick="markStatus(this, 'cancel')">Cancelar</button>
+                    <button onclick="deleteRow(this)">Apagar</button>
+                </td>
+            `;
+
+            return row;
+        }
+
+        addForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const itemName = document.getElementById('itemName').value;
+            const itemQuantity = parseInt(document.getElementById('itemQuantity').value);
+            const requestedBy = document.getElementById('requestedBy').value;
+            const currentDate = new Date().toLocaleString('pt-BR');
+
+            if (itemsData[itemName]) {
+                // Se o item já existir, atualiza a quantidade
+                itemsData[itemName].quantity += itemQuantity;
+                updateTable();
+            } else {
+                // Se for um novo item, adiciona ao objeto
+                itemsData[itemName] = {
+                    quantity: itemQuantity,
+                    requestedBy: requestedBy,
+                    date: currentDate,
+                    status: "Pendente"
+                };
+                addNewRow(itemName, itemQuantity, requestedBy, currentDate);
+            }
+
+            addForm.reset();
+        });
+
+        function addNewRow(itemName, quantity, requestedBy, date) {
+            const newRow = createTableRow(itemName, quantity, requestedBy, date, "Pendente");
+            itemsTable.prepend(newRow);
+        }
+
+        function updateTable() {
+            itemsTable.innerHTML = ""; // Limpa a tabela
+            Object.keys(itemsData).forEach(itemName => {
+                const { quantity, requestedBy, date, status } = itemsData[itemName];
+                const newRow = createTableRow(itemName, quantity, requestedBy, date, status);
+                updateStatus(newRow, status);
+                itemsTable.prepend(newRow);
+            });
+        }
+
+        function deleteRow(button) {
+            const row = button.parentElement.parentElement;
+            const itemName = row.cells[0].textContent;
+
+            if (itemsData[itemName].status === 'Comprado' || itemsData[itemName].status === 'Cancelado') {
+                alert('Não é possível excluir itens com status Comprado ou Cancelado.');
+                return;
+            }
+
+            delete itemsData[itemName];
+            row.remove();
+        }
+
+        function markStatus(button, status) {
+            const row = button.parentElement.parentElement;
+            const statusCell = row.querySelector('.status');
+            const itemName = row.cells[0].textContent;
+
+            if (itemsData[itemName].status === 'Cancelado' && status === 'ok') {
+                alert('Não é possível marcar como OK se a peça estiver Cancelada.');
+                return;
+            }
+
+            if (itemsData[itemName].status === 'Comprado' && status === 'cancel') {
+                alert('Não é possível cancelar uma peça marcada como Comprada.');
+                return;
+            }
+
+            if (status === 'ok') {
+                statusCell.textContent = 'Comprado';
+                statusCell.className = 'status status-ok';
+                itemsData[itemName].status = 'Comprado';
+            } else if (status === 'cancel') {
+                statusCell.textContent = 'Cancelado';
+                statusCell.className = 'status status-cancelled';
+                itemsData[itemName].status = 'Cancelado';
+            }
+        }
+
+        function printPendingItems() {
+            const printWindow = window.open('', '', 'width=800,height=600');
+            let printContent = `
+                <html>
+                <head>
+                    <title>Imprimir Pendentes</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; }
+                        table { width: 100%; border-collapse: collapse; }
+                        table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                        table th { background-color: #004d00; color: white; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Peças Pendentes</h1>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome da Peça</th>
+                                <th>Quantidade</th>
+                                <th>Solicitante</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            Object.keys(itemsData).forEach(itemName => {
+                const { quantity, requestedBy, date, status } = itemsData[itemName];
+                if (status === 'Pendente') {
+                    printContent += `
+                        <tr>
+                            <td>${itemName}</td>
+                            <td>${quantity}</td>
+                            <td>${requestedBy}</td>
+                            <td>${date}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            printContent += `
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.print();
+        }
+    </script>
+</body>
+</html>
+
